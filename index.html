@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -26,6 +27,7 @@ svg{display:block;width:100%;height:auto;border-radius:10px}
 .pt:hover circle,.pt:focus circle{fill:var(--soft);stroke:var(--acc)}
 .pt.sel circle{fill:var(--acc);stroke:var(--acc)}.pt.opt circle{stroke:var(--ok);stroke-width:4}
 .pt.locked{cursor:default}
+.live{display:flex;flex-wrap:wrap;gap:6px 24px;margin:10px 3px 0;font-size:14px;color:var(--mute);font-variant-numeric:tabular-nums}.live b{color:var(--ink);font-size:16px}
 .hint{color:var(--mute);font-size:13px;margin:10px 3px 0}
 .controls{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:12px}
 .status{color:var(--mute);font-size:14px}
@@ -36,6 +38,10 @@ button:hover{background:var(--soft)}
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
 .stat{background:var(--soft);padding:10px;border-radius:8px}
 .stat span{display:block;color:var(--mute);font-size:11px}.stat strong{display:block;font-size:17px;margin-top:3px}
+.tbl{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums}
+.tbl th,.tbl td{padding:9px 10px;text-align:left;border-bottom:1px solid var(--line)}
+.tbl thead th{color:var(--mute);font-size:11px;font-weight:normal}.tbl tbody th{font-weight:bold}
+.tbl tr:last-child>*{border-bottom:0}.tbl .o>*{color:var(--ok)}
 @media (max-width:600px){.stats{grid-template-columns:1fr}.controls{flex-direction:column;align-items:stretch}.meta{text-align:left}}
 </style>
 </head>
@@ -68,6 +74,10 @@ button:hover{background:var(--soft)}
       <circle id="ball" r="7" fill="var(--acc)"/>
       <g id="points"></g>
     </svg>
+    <div class="live" aria-hidden="true">
+      <div>Tiempo: <b id="liveT">0.00</b> s</div>
+      <div>Distancia: <b id="liveD">0.0</b> u</div>
+    </div>
     <div class="hint">Haz clic o pulsa A–G en el teclado. La velocidad es constante: menos distancia = menos tiempo.</div>
   </div>
 
@@ -76,6 +86,14 @@ button:hover{background:var(--soft)}
     <button id="reset" type="button">Nueva ronda</button>
   </div>
   <div id="result" class="result" hidden></div>
+  <div id="cmp" class="result" hidden>
+    <div style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr><th></th><th>Punto</th><th>Tiempo</th><th>Distancia</th></tr></thead>
+        <tbody id="cmpBody"></tbody>
+      </table>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -97,8 +115,27 @@ function renderStats() {
   $("dots").innerHTML = Array.from({ length: MAX }, (_, i) => `<span class="dot${i < tries.length ? " used" : ""}"></span>`).join("");
 }
 
+function setLive(s) { $("liveD").textContent = s.toFixed(1); $("liveT").textContent = (s / SPEED).toFixed(2); }
+
+let finished = [], over = false;
+function renderCmp() {
+  $("cmp").hidden = !finished.length;
+  if (!finished.length) return; // sin intentos: no toca `points` (aún puede no existir)
+  const row = (name, i, cls = "", empty = "—") => {
+    const p = i == null ? null : points[i];
+    return `<tr class="${cls}"><th>${name}</th>` + (p
+      ? `<td>${p.label}</td><td>${(p.total / SPEED).toFixed(2)} s</td><td>${p.total.toFixed(1)} u</td>`
+      : `<td>${empty}</td><td>${empty}</td><td>${empty}</td>`) + "</tr>";
+  };
+  const best = finished.reduce((a, b) => points[b].total < points[a].total ? b : a);
+  $("cmpBody").innerHTML =
+    row("Óptimo", over ? points.findIndex(p => p.optimal) : null, "o", "?") +
+    row("Anterior", tries.length >= 2 ? tries[0] : null) +
+    row("Mejor", best);
+}
+
 function newRound() {
-  cancelAnimationFrame(raf); animating = false; tries = [];
+  cancelAnimationFrame(raf); animating = false; tries = []; finished = []; over = false; setLive(0); renderCmp();
   resultEl.hidden = true; $("paths").innerHTML = "";
   player = { x: 105, y: 75 + Math.random() * 100 };
   target = { x: 480, y: 55 + Math.random() * 65 };
@@ -127,7 +164,7 @@ function drawPoints() {
 
 function select(i) {
   if (animating || tries.length >= MAX || tries.includes(i)) return;
-  tries.push(i); renderStats();
+  tries.push(i); renderStats(); renderCmp();
   const p = points[i];
   document.querySelectorAll(".pt")[i].classList.add("sel");
   const col = tries.length === 1 ? "#f79009" : "#635bff";
@@ -135,6 +172,7 @@ function select(i) {
     fill: "none", stroke: col, "stroke-width": 2, "stroke-opacity": .55 }));
   statusEl.textContent = `Elegiste ${p.label}: ${(p.total / SPEED).toFixed(2)} s...`;
   animate(p, () => {
+    finished.push(i); renderCmp();
     if (tries.length < MAX) statusEl.textContent = `${p.label}: ${(p.total / SPEED).toFixed(2)} s. Te queda 1 intento, prueba otro punto.`;
     else finish();
   });
@@ -147,6 +185,7 @@ function animate(p, done) {
     const s = Math.min((now - t0) / dur, 1) * total;
     const [a, b, k] = s <= d1 ? [player, p, d1 ? s / d1 : 1] : [p, target, (s - d1) / (total - d1)];
     ball.setAttribute("cx", a.x + (b.x - a.x) * k); ball.setAttribute("cy", a.y + (b.y - a.y) * k);
+    setLive(s);
     if (s < total) raf = requestAnimationFrame(step); else { animating = false; done(); }
   })(t0);
 }
@@ -163,12 +202,8 @@ function finish() {
     fill: "none", stroke: "#12b76a", "stroke-width": 3, "stroke-dasharray": "6 5" }));
   resultEl.hidden = false;
   resultEl.innerHTML = `<div class="verdict ${hit ? "ok" : "bad"}">${hit ? "¡Trayectoria óptima!" : "Casi: el óptimo era " + opt.label}</div>
-    <div class="stats">
-      <div class="stat"><span>Tu mejor punto</span><strong>${best.label} · ${tYou.toFixed(2)} s</strong></div>
-      <div class="stat"><span>Tiempo óptimo (${opt.label})</span><strong>${tOpt.toFixed(2)} s</strong></div>
-      <div class="stat"><span>Diferencia</span><strong>${hit ? "0.00 s" : "+" + gap.toFixed(2) + " s (" + (gap / tOpt * 100).toFixed(1) + "%)"}</strong></div>
-    </div>`;
-  statusEl.textContent = "Ronda terminada."; renderStats();
+    <div class="sub">Diferencia con el óptimo: <b>${hit ? "0.00 s" : "+" + gap.toFixed(2) + " s (" + (gap / tOpt * 100).toFixed(1) + "%)"}</b></div>`;
+  over = true; renderCmp(); statusEl.textContent = "Ronda terminada."; renderStats();
 }
 
 $("reset").addEventListener("click", newRound);

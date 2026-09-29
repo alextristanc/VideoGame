@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fermat's Light Co-Op V3</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            background-color: #05050A; /* Fondo muy oscuro, casi negro */
+            color: #fff;
+            font-family: 'Press Start 2P', monospace;
+            margin: 0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            user-select: none;
+        }
+
+        h1.glitch-title {
+            font-size: 24px;
+            color: white;
+            text-shadow: 2px 2px 0px #00f3ff, -2px -2px 0px #ff0055;
+            margin-bottom: 15px;
+            letter-spacing: 2px;
+        }
+
+        .info-box {
+            border: 3px solid #fff;
+            background-color: #0a0a16;
+            padding: 10px 20px;
+            font-size: 10px;
+            line-height: 1.5;
+            margin-bottom: 20px;
+            box-shadow: 0 0 10px rgba(255,255,255,0.1);
+            width: 525px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .pixel-border {
+            border: 4px solid #fff;
+            box-shadow: 0 0 20px rgba(255,255,255,0.1);
+            background: #0a0a14;
+        }
+
+        canvas {
+            image-rendering: pixelated;
+        }
+
+        .scanlines {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(
+                to bottom,
+                rgba(255,255,255,0),
+                rgba(255,255,255,0) 50%,
+                rgba(0,0,0,0.2) 50%,
+                rgba(0,0,0,0.2)
+            );
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 50;
+        }
+
+        .btn {
+            background-color: #ff0055;
+            color: white;
+            border: 3px solid #fff;
+            padding: 15px 30px;
+            font-family: inherit;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.1s;
+        }
+        
+        .btn:hover {
+            background-color: #ff3377;
+        }
+
+        .btn:active {
+            transform: translate(2px, 2px);
+        }
+
+        .overlay {
+            background: rgba(5, 5, 10, 0.95);
+        }
+
+        .controls-bar {
+            display: flex;
+            justify-content: space-between;
+            width: 525px;
+            margin-top: 15px;
+            font-size: 9px;
+            line-height: 1.6;
+        }
+
+        .text-red { color: #ff0055; }
+        .text-cyan { color: #00f3ff; }
+        .text-yellow { color: #ffcc00; }
+    </style>
+</head>
+<body>
+    <div class="scanlines"></div>
+
+    <div class="z-10 flex flex-col items-center relative">
+        <h1 class="glitch-title">FERMAT'S LIGHT: CO-OP</h1>
+        
+        <div class="info-box">
+            <div>
+                NIVEL <span id="level-indicator" class="text-yellow">1</span>: <span id="level-name">EL LABERINTO</span>
+            </div>
+            <div>
+                REFLEJOS: <span id="reflejos-count">0</span>
+            </div>
+        </div>
+
+        <div class="relative">
+            <canvas id="gameCanvas" width="525" height="525" class="pixel-border"></canvas>
+            
+            <!-- Pantallas de UI -->
+            <div id="start-screen" class="absolute inset-0 flex flex-col items-center justify-center text-center p-6 z-30 overlay">
+                <h2 class="text-xl text-yellow mb-8 animate-pulse">SISTEMA LISTO</h2>
+                <button id="btn-start" class="btn">INICIAR ENLACE</button>
+            </div>
+
+            <div id="transition-screen" class="absolute inset-0 hidden flex-col items-center justify-center text-center p-6 z-20 overlay">
+                <h2 class="text-xl text-cyan mb-4 animate-pulse">RUTA CONFIRMADA</h2>
+                <p class="text-[10px]">Generando laberinto...</p>
+            </div>
+
+            <div id="end-screen" class="absolute inset-0 hidden flex-col items-center justify-center text-center p-6 z-40 overlay">
+                <h2 class="text-xl text-yellow mb-4">PRUEBA SUPERADA</h2>
+                <p class="text-[9px] leading-loose mb-6">
+                    El Principio de Fermat ha sido demostrado.<br>
+                    La luz encontró el camino correcto.
+                </p>
+                <button onclick="location.reload()" class="btn">REINICIAR SISTEMA</button>
+            </div>
+        </div>
+
+        <div class="controls-bar">
+            <div class="text-left">
+                <span class="text-red">J1 (ROJO)</span><br>
+                Mover: W A S D<br>
+                Espejo: ESPACIO
+            </div>
+            <div class="text-right">
+                <span class="text-cyan">J2 (CIAN)</span><br>
+                Mover: FLECHAS<br>
+                Espejo: ENTER
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const GRID_SIZE = 15;
+        const CELL_SIZE = canvas.width / GRID_SIZE;
+        const TARGET_POS = { x: 7, y: 7 };
+        
+        let grid = []; 
+        let currentLevel = 0;
+        let isTransitioning = false;
+        let audioStarted = false;
+        let synth, fxSynth;
+
+        const p1 = { x: 0, y: 0, color: '#ff0055', core: '#ffb3cc' };
+        const p2 = { x: 0, y: 0, color: '#00f3ff', core: '#b3fbff' };
+
+        function createMap(mapStrArray) {
+            return mapStrArray.map(row => row.split('').map(Number));
+        }
+
+        const levels = [
+            {
+                name: "EL LABERINTO",
+                emitters: [
+                    { id: 'red', x: 1, y: 1, dx: 1, dy: 0, color: p1.color, core: p1.core },
+                    { id: 'cyan', x: 13, y: 13, dx: -1, dy: 0, color: p2.color, core: p2.core }
+                ],
+                map: createMap([
+                    "111111111111111",
+                    "100000000000001",
+                    "101111010111101",
+                    "101000000000101",
+                    "101011101110101",
+                    "100010000010001",
+                    "101010111010101",
+                    "100010000010001",
+                    "101010111010101",
+                    "100010000010001",
+                    "101011101110101",
+                    "101000000000101",
+                    "101111010111101",
+                    "100000000000001",
+                    "111111111111111"
+                ])
+            },
+            {
+                name: "LA BIFURCACION",
+                emitters: [
+                    { id: 'red', x: 1, y: 7, dx: 1, dy: 0, color: p1.color, core: p1.core },
+                    { id: 'cyan', x: 13, y: 7, dx: -1, dy: 0, color: p2.color, core: p2.core }
+                ],
+                map: createMap([
+                    "111111111111111",
+                    "100000101000001",
+                    "101110101011101",
+                    "101000000000101",
+                    "101011111110101",
+                    "100010000010001",
+                    "111010101000111",
+                    "100000101001001",
+                    "111010101010011",
+                    "100010000010101",
+                    "101011111110101",
+                    "101000000000101",
+                    "101110101011101",
+                    "100000101000001",
+                    "111111111111111"
+                ])
+            },
+            {
+                name: "EL RELOJ",
+                emitters: [
+                    { id: 'red', x: 7, y: 1, dx: 0, dy: 1, color: p1.color, core: p1.core },
+                    { id: 'cyan', x: 7, y: 13, dx: 0, dy: -1, color: p2.color, core: p2.core }
+                    
+                ],
+                map: createMap([
+                    "111111111111111",
+                    "100000000000001",
+                    "101111101101101",
+                    "100111100001001",
+                    "100011101110001",
+                    "110001101100011",
+                    "111000010000111",
+                    "111110000011111",
+                    "111000010000111",
+                    "110001101100011",
+                    "000000000100000",
+                    "100111101111001",
+                    "101111101111101",
+                    "100000000000001",
+                    "111111111111111"
+                ])
+            },
+            {
+                name: "LA PRISION",
+                emitters: [
+                    { id: 'red', x: 1, y: 1, dx: 1, dy: 0, color: p1.color, core: p1.core },
+                    { id: 'cyan', x: 13, y: 13, dx: -1, dy: 0, color: p2.color, core: p2.core }
+                ],
+                map: createMap([
+                    "111111111111111",
+                    "100000000000001",
+                    "111011010111101",
+                    "100000000000001",
+                    "101101011011111",
+                    "100010100010101",
+                    "101010101010101",
+                    "101000000001001",
+                    "101010101010101",
+                    "101010000010101",
+                    "101011111110101",
+                    "101000000000101",
+                    "101010100110101",
+                    "100100100000001",
+                    "111111111111111"
+                ])
+            }
+        ];
+
+        function initAudio() {
+            if (audioStarted) return;
+            audioStarted = true;
+            
+            synth = new Tone.PolySynth(Tone.Synth, {
+                oscillator: { type: "square" },
+                envelope: { attack: 0.1, decay: 0.2, sustain: 0.2, release: 0.1 }
+            }).toDestination();
+            synth.volume.value = -20;
+
+            fxSynth = new Tone.Synth({ oscillator: { type: "triangle" } }).toDestination();
+            fxSynth.volume.value = -10;
+
+            const melody = ["C4", "E4", "A4", "G4", "C5", "A4", "G4", "E4"];
+            let step = 0;
+
+            Tone.Transport.scheduleRepeat(time => {
+                let note = melody[step % melody.length];
+                if (note) synth.triggerAttackRelease(note, "8n", time);
+                step++;
+            }, "4n");
+
+            Tone.Transport.bpm.value = 130;
+            Tone.Transport.start();
+        }
+
+        function playSound(type) {
+            if(!audioStarted) return;
+            if(type === 'place') fxSynth.triggerAttackRelease("C6", "16n");
+            if(type === 'win') {
+                const winFx = new Tone.PolySynth(Tone.Synth).toDestination();
+                winFx.volume.value = -10;
+                winFx.triggerAttackRelease(["C4", "E4", "G4", "C5"], "2n");
+            }
+        }
+
+        function updateReflectionsCount() {
+            let count = 0;
+            for(let y=0; y<GRID_SIZE; y++){
+                for(let x=0; x<GRID_SIZE; x++){
+                    if(grid[y][x] === '/' || grid[y][x] === '\\') count++;
+                }
+            }
+            document.getElementById('reflejos-count').innerText = count;
+        }
+
+        function loadLevel(index) {
+            if (index >= levels.length) {
+                document.getElementById('end-screen').classList.remove('hidden');
+                document.getElementById('end-screen').classList.add('flex');
+                return;
+            }
+
+            currentLevel = index;
+            document.getElementById('level-indicator').innerText = index + 1;
+            document.getElementById('level-name').innerText = levels[index].name;
+            document.getElementById('transition-screen').classList.add('hidden');
+            document.getElementById('transition-screen').classList.remove('flex');
+
+            grid = levels[index].map.map(row => [...row]);
+            updateReflectionsCount();
+            
+            p1.x = 3; p1.y = 3;
+            p2.x = 11; p2.y = 11;
+            isTransitioning = false;
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (isTransitioning || !audioStarted) return;
+            
+            if (e.key === 'w' || e.key === 'W') { if (p1.y > 0) p1.y--; }
+            if (e.key === 's' || e.key === 'S') { if (p1.y < GRID_SIZE-1) p1.y++; }
+            if (e.key === 'a' || e.key === 'A') { if (p1.x > 0) p1.x--; }
+            if (e.key === 'd' || e.key === 'D') { if (p1.x < GRID_SIZE-1) p1.x++; }
+            if (e.key === ' ') toggleMirror(p1.x, p1.y);
+
+            if (e.key === 'ArrowUp') { if (p2.y > 0) p2.y--; }
+            if (e.key === 'ArrowDown') { if (p2.y < GRID_SIZE-1) p2.y++; }
+            if (e.key === 'ArrowLeft') { if (p2.x > 0) p2.x--; }
+            if (e.key === 'ArrowRight') { if (p2.x < GRID_SIZE-1) p2.x++; }
+            if (e.key === 'Enter') toggleMirror(p2.x, p2.y);
+        });
+
+        function toggleMirror(x, y) {
+            if (grid[y][x] === 1) return;
+            if (x === TARGET_POS.x && y === TARGET_POS.y) return;
+            if (levels[currentLevel].emitters.some(em => em.x === x && em.y === y)) return;
+
+            const state = grid[y][x];
+            if (state === 0) grid[y][x] = '/';
+            else if (state === '/') grid[y][x] = '\\';
+            else grid[y][x] = 0;
+            
+            playSound('place');
+            updateReflectionsCount();
+        }
+
+        function traceLaser(emitter) {
+            let path = [];
+            let x = emitter.x;
+            let y = emitter.y;
+            let dx = emitter.dx;
+            let dy = emitter.dy;
+            
+            let hitTarget = false;
+            let steps = 0;
+            const MAX_STEPS = 150; 
+
+            path.push({ cx: x * CELL_SIZE + CELL_SIZE/2, cy: y * CELL_SIZE + CELL_SIZE/2 });
+
+            while (steps < MAX_STEPS) {
+                x += dx;
+                y += dy;
+                steps++;
+
+                if (x < 0 || x >= GRID_SIZE || y < 0 || y >= GRID_SIZE) {
+                    path.push({ cx: (x-dx)*CELL_SIZE + CELL_SIZE/2 + dx*CELL_SIZE, cy: (y-dy)*CELL_SIZE + CELL_SIZE/2 + dy*CELL_SIZE });
+                    break;
+                }
+
+                const cell = grid[y][x];
+                path.push({ cx: x * CELL_SIZE + CELL_SIZE/2, cy: y * CELL_SIZE + CELL_SIZE/2 });
+
+                if (x === TARGET_POS.x && y === TARGET_POS.y) {
+                    hitTarget = true;
+                    break; 
+                }
+
+                if (cell === 1) break; 
+                
+                if (cell === '/') {
+                    let newDx = -dy;
+                    let newDy = -dx;
+                    dx = newDx; dy = newDy;
+                } else if (cell === '\\') {
+                    let newDx = dy;
+                    let newDy = dx;
+                    dx = newDx; dy = newDy;
+                }
+            }
+            return { path, hitTarget };
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 1. Dibujar Cuadrícula y Muros (Estética Laberinto)
+            for (let y = 0; y < GRID_SIZE; y++) {
+                for (let x = 0; x < GRID_SIZE; x++) {
+                    
+                    if (grid[y][x] === 1) {
+                        // Muro Oscuro
+                        ctx.fillStyle = '#1e1e2e'; 
+                        ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+                        
+                        // Efecto Biselado para que parezcan bloques
+                        ctx.fillStyle = 'rgba(255,255,255,0.05)';
+                        ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, 2);
+                        ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, 2, CELL_SIZE);
+                        ctx.fillStyle = 'rgba(0,0,0,0.4)';
+                        ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE + CELL_SIZE - 2, CELL_SIZE, 2);
+                        ctx.fillRect(x * CELL_SIZE + CELL_SIZE - 2, y * CELL_SIZE, 2, CELL_SIZE);
+                    } else {
+                        // Suelo Vacío
+                        ctx.fillStyle = '#0a0a14';
+                        ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+                        ctx.strokeStyle = '#151525';
+                        ctx.lineWidth = 1;
+                        ctx.strokeRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+                    }
+
+                    // Espejos
+                    if (grid[y][x] === '/' || grid[y][x] === '\\') {
+                        ctx.strokeStyle = '#fff';
+                        ctx.lineWidth = 3;
+                        ctx.shadowBlur = 5;
+                        ctx.shadowColor = '#00f3ff';
+                        ctx.beginPath();
+                        if (grid[y][x] === '/') {
+                            ctx.moveTo(x * CELL_SIZE + 6, y * CELL_SIZE + CELL_SIZE - 6);
+                            ctx.lineTo(x * CELL_SIZE + CELL_SIZE - 6, y * CELL_SIZE + 6);
+                        } else {
+                            ctx.moveTo(x * CELL_SIZE + 6, y * CELL_SIZE + 6);
+                            ctx.lineTo(x * CELL_SIZE + CELL_SIZE - 6, y * CELL_SIZE + CELL_SIZE - 6);
+                        }
+                        ctx.stroke();
+                        ctx.shadowBlur = 0;
+                    }
+                }
+            }
+
+            // 2. Dibujar Láseres (Con núcleo brillante como en la imagen)
+            let hits = 0;
+            if(levels[currentLevel]) {
+                levels[currentLevel].emitters.forEach(em => {
+                    const result = traceLaser(em);
+                    if (result.hitTarget) hits++;
+
+                    if(result.path.length > 0) {
+                        // Brillo Exterior
+                        ctx.beginPath();
+                        ctx.strokeStyle = em.color;
+                        ctx.lineWidth = 6;
+                        ctx.shadowBlur = 10;
+                        ctx.shadowColor = em.color;
+                        ctx.moveTo(result.path[0].cx, result.path[0].cy);
+                        for (let i = 1; i < result.path.length; i++) {
+                            ctx.lineTo(result.path[i].cx, result.path[i].cy);
+                        }
+                        ctx.stroke();
+                        
+                        // Núcleo Blanco/Claro
+                        ctx.beginPath();
+                        ctx.strokeStyle = em.core;
+                        ctx.lineWidth = 2;
+                        ctx.shadowBlur = 0;
+                        ctx.moveTo(result.path[0].cx, result.path[0].cy);
+                        for (let i = 1; i < result.path.length; i++) {
+                            ctx.lineTo(result.path[i].cx, result.path[i].cy);
+                        }
+                        ctx.stroke();
+                    }
+                });
+
+                // Dibujar Cajas de Emisores
+                levels[currentLevel].emitters.forEach(em => {
+                    ctx.fillStyle = em.color;
+                    ctx.fillRect(em.x * CELL_SIZE + 6, em.y * CELL_SIZE + 6, CELL_SIZE - 12, CELL_SIZE - 12);
+                });
+            }
+
+            // 3. Dibujar Objetivo Central (Núcleo)
+            const tx = TARGET_POS.x * CELL_SIZE;
+            const ty = TARGET_POS.y * CELL_SIZE;
+            ctx.fillStyle = '#ffcc00';
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = '#ffcc00';
+            ctx.fillRect(tx + 8, ty + 8, CELL_SIZE - 16, CELL_SIZE - 16);
+            ctx.shadowBlur = 0;
+
+            // 4. Dibujar Cursores de Jugadores (Parpadeantes)
+            if (Date.now() % 1000 < 500) {
+                ctx.strokeStyle = p1.color;
+                ctx.lineWidth = 2;
+                ctx.strokeRect(p1.x * CELL_SIZE + 1, p1.y * CELL_SIZE + 1, CELL_SIZE - 2, CELL_SIZE - 2);
+
+                ctx.strokeStyle = p2.color;
+                ctx.lineWidth = 2;
+                ctx.strokeRect(p2.x * CELL_SIZE + 3, p2.y * CELL_SIZE + 3, CELL_SIZE - 6, CELL_SIZE - 6);
+            }
+
+            // 5. Lógica de Victoria
+            if (levels[currentLevel] && hits === levels[currentLevel].emitters.length && !isTransitioning) {
+                isTransitioning = true;
+                playSound('win');
+                setTimeout(() => {
+                    document.getElementById('transition-screen').classList.remove('hidden');
+                    document.getElementById('transition-screen').classList.add('flex');
+                    setTimeout(() => loadLevel(currentLevel + 1), 2000);
+                }, 1000);
+            }
+
+            requestAnimationFrame(draw);
+        }
+
+        window.onload = function() {
+            // Generar la matriz antes del primer frame
+            loadLevel(0);
+            draw();
+        }
+
+        document.getElementById('btn-start').addEventListener('click', async () => {
+            await Tone.start();
+            initAudio();
+            document.getElementById('start-screen').classList.add('hidden');
+        });
+    </script>
+</body>
+</html>

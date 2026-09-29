@@ -1,6 +1,6 @@
 # 🎯 Trayectoria Óptima
 
-Juego web de un solo archivo (`trayectoria-optima.html`). Una pelota sale del jugador, toca un punto de la línea inferior y llega al objetivo. Tu meta es elegir el punto **A–G** que produzca el recorrido más corto.
+Juego web de un solo archivo (`index.html`). Una pelota sale del jugador, toca un punto de la línea inferior y llega al objetivo. Tu meta es elegir el punto **A–G** que produzca el recorrido más corto.
 
 ## Cómo jugar
 
@@ -24,6 +24,7 @@ Juego web de un solo archivo (`trayectoria-optima.html`). Una pelota sale del ju
 - Resultado con diferencia en segundos y porcentaje contra el óptimo.
 - Marcador: aciertos/rondas, racha actual y mejor racha.
 - Modo oscuro automático (`prefers-color-scheme`).
+- Tema forzable con `<html data-theme="dark">` o `<html data-theme="light">`.
 - Sin dependencias ni build: HTML + CSS + JavaScript.
 
 ## La matemática
@@ -38,7 +39,7 @@ Es el problema clásico de la **reflexión** (principio de Fermat): la ruta más
 
 ## Ejecutar
 
-Abre `trayectoria-optima.html` en cualquier navegador moderno. No requiere servidor.
+Abre `index.html` en cualquier navegador moderno. No requiere servidor.
 
 ## Configuración
 
@@ -58,7 +59,7 @@ Solo la **mejor racha** se guarda en `localStorage` (clave `trayectoria`). Si el
 ## Estructura
 
 ```
-trayectoria-optima.html   # marcado, estilos y lógica
+index.html   # marcado, estilos y lógica
 ```
 
 Funciones principales: `newRound()`, `select(i)`, `animate(p, done)`, `finish()`.

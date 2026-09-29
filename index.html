@@ -1,1483 +1,183 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trayectoria Óptima</title>
-
-    <style>
-        * {
-            box-sizing: border-box;
-        }
-
-        body {
-            margin: 0;
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            background: #f2f2f2;
-            font-family: Arial, sans-serif;
-            color: #17202a;
-        }
-
-        .game {
-            width: min(750px, 95vw);
-        }
-
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
-        }
-
-        h1 {
-            font-size: 22px;
-            margin: 0;
-        }
-
-        .subtitle {
-            color: #667085;
-            font-size: 14px;
-            margin-top: 4px;
-        }
-
-        .attempts {
-            font-weight: bold;
-            white-space: nowrap;
-        }
-
-        .attempt {
-            display: inline-block;
-            width: 12px;
-            height: 12px;
-            border: 2px solid #222;
-            border-radius: 50%;
-            margin-left: 5px;
-        }
-
-        .attempt.used {
-            background: #aaa;
-        }
-
-        .game-area {
-            background: white;
-            border: 1px solid #ddd;
-            border-radius: 16px;
-            padding: 10px;
-        }
-
-        svg {
-            display: block;
-            width: 100%;
-            height: auto;
-            background: white;
-            border-radius: 10px;
-        }
-
-        /* Puntos A-G */
-
-        .point {
-            cursor: pointer;
-        }
-
-        .point circle {
-            fill: white;
-            stroke: #202733;
-            stroke-width: 2.5;
-        }
-
-        .point text {
-            font-size: 15px;
-            font-weight: bold;
-            fill: #202733;
-            text-anchor: middle;
-        }
-
-        .point:hover circle {
-            fill: #eeeeff;
-        }
-
-        .point.selected circle {
-            fill: #e8e6ff;
-            stroke: #635bff;
-            stroke-width: 3;
-        }
-
-        .point.optimal circle {
-            stroke: #222;
-            stroke-dasharray: 4 3;
-        }
-
-        /* Información */
-
-        .hint {
-            color: #667085;
-            font-size: 13px;
-            margin: 10px 3px 0;
-        }
-
-        .controls {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 10px;
-            margin-top: 12px;
-        }
-
-        .status {
-            color: #667085;
-            font-size: 14px;
-        }
-
-        button {
-            border: 1px solid #ccc;
-            background: white;
-            padding: 10px 16px;
-            border-radius: 10px;
-            font-weight: bold;
-            cursor: pointer;
-        }
-
-        button:hover {
-            background: #f0f0f0;
-        }
-
-        /* Resultado */
-
-        .result {
-            margin-top: 12px;
-            padding: 14px;
-            background: white;
-            border: 1px solid #ddd;
-            border-radius: 12px;
-        }
-
-        .stats {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 8px;
-            margin-top: 10px;
-        }
-
-        .stat {
-            background: #f6f6f7;
-            padding: 10px;
-            border-radius: 8px;
-        }
-
-        .stat span {
-            display: block;
-            color: #667085;
-            font-size: 11px;
-        }
-
-        .stat strong {
-            display: block;
-            font-size: 17px;
-            margin-top: 3px;
-        }
-
-        @media (max-width: 600px) {
-            .header {
-                align-items: flex-start;
-                flex-direction: column;
-                gap: 8px;
-            }
-
-            .stats {
-                grid-template-columns: 1fr;
-            }
-
-            .controls {
-                flex-direction: column;
-                align-items: stretch;
-            }
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Trayectoria Óptima</title>
+<style>
+:root{--bg:#f2f2f2;--card:#fff;--ink:#17202a;--mute:#667085;--line:#ddd;--acc:#635bff;--ok:#12b76a;--bad:#f04438;--soft:#f6f6f7;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#111318;--card:#1a1d24;--ink:#e8eaf0;--mute:#98a2b3;--line:#2d323c;--soft:#232730;--acc:#8b85ff}}
+:root[data-theme="dark"]{--bg:#111318;--card:#1a1d24;--ink:#e8eaf0;--mute:#98a2b3;--line:#2d323c;--soft:#232730;--acc:#8b85ff}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Arial,sans-serif;display:flex;justify-content:center;padding:16px}
+.game{width:min(750px,100%)}
+.header{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+h1{font-size:22px;margin:0}.sub{color:var(--mute);font-size:14px;margin-top:4px}
+.meta{text-align:right;font-size:13px;color:var(--mute)}.meta b{color:var(--ink)}
+.dot{display:inline-block;width:12px;height:12px;border:2px solid var(--ink);border-radius:50%;margin-left:5px;vertical-align:middle}
+.dot.used{background:var(--mute)}
+.area{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:10px}
+svg{display:block;width:100%;height:auto;border-radius:10px}
+.ink{stroke:var(--ink);fill:none}.fillink{fill:var(--ink)}
+.pt{cursor:pointer;outline:none}.pt circle{fill:var(--card);stroke:var(--ink);stroke-width:2.5}
+.pt text{font-size:15px;font-weight:bold;fill:var(--ink);text-anchor:middle}
+.pt:hover circle,.pt:focus circle{fill:var(--soft);stroke:var(--acc)}
+.pt.sel circle{fill:var(--acc);stroke:var(--acc)}.pt.opt circle{stroke:var(--ok);stroke-width:4}
+.pt.locked{cursor:default}
+.hint{color:var(--mute);font-size:13px;margin:10px 3px 0}
+.controls{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:12px}
+.status{color:var(--mute);font-size:14px}
+button{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:10px 16px;border-radius:10px;font-weight:bold;cursor:pointer}
+button:hover{background:var(--soft)}
+.result{margin-top:12px;padding:14px;background:var(--card);border:1px solid var(--line);border-radius:12px}
+.verdict{font-size:17px;font-weight:bold}.verdict.ok{color:var(--ok)}.verdict.bad{color:var(--bad)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.stat{background:var(--soft);padding:10px;border-radius:8px}
+.stat span{display:block;color:var(--mute);font-size:11px}.stat strong{display:block;font-size:17px;margin-top:3px}
+@media (max-width:600px){.stats{grid-template-columns:1fr}.controls{flex-direction:column;align-items:stretch}.meta{text-align:left}}
+</style>
 </head>
-
 <body>
-
 <div class="game">
-
-    <div class="header">
-
-        <div>
-            <h1>Encuentra la trayectoria óptima</h1>
-
-            <div class="subtitle">
-                Elige el punto que produzca el menor recorrido.
-            </div>
-        </div>
-
-        <div class="attempts" id="attempts">
-            Intentos:
-            <span class="attempt"></span>
-            <span class="attempt"></span>
-        </div>
-
+  <div class="header">
+    <div>
+      <h1>Encuentra la trayectoria óptima</h1>
+      <div class="sub">Elige el punto que produzca el menor recorrido.</div>
     </div>
-
-
-    <div class="game-area">
-
-        <svg
-            id="scene"
-            viewBox="0 0 700 410"
-            aria-label="Juego de trayectoria"
-        >
-
-            <!-- Línea donde están los puntos -->
-
-            <line
-                x1="70"
-                y1="335"
-                x2="630"
-                y2="335"
-                stroke="#202733"
-                stroke-width="3"
-            />
-
-
-            <!-- Aquí aparecerán las trayectorias óptimas -->
-
-            <g id="paths"></g>
-
-
-            <!-- JUGADOR -->
-
-            <g id="player">
-
-                <!-- cabeza -->
-                <circle
-                    cx="105"
-                    cy="85"
-                    r="16"
-                    fill="white"
-                    stroke="#202733"
-                    stroke-width="3"
-                />
-
-                <!-- cuerpo -->
-                <line
-                    x1="105"
-                    y1="101"
-                    x2="105"
-                    y2="145"
-                    stroke="#202733"
-                    stroke-width="4"
-                    stroke-linecap="round"
-                />
-
-                <!-- brazo izquierdo -->
-                <line
-                    x1="105"
-                    y1="112"
-                    x2="78"
-                    y2="128"
-                    stroke="#202733"
-                    stroke-width="4"
-                    stroke-linecap="round"
-                />
-
-                <!-- brazo derecho -->
-                <line
-                    x1="105"
-                    y1="112"
-                    x2="132"
-                    y2="128"
-                    stroke="#202733"
-                    stroke-width="4"
-                    stroke-linecap="round"
-                />
-
-                <!-- pierna izquierda -->
-                <line
-                    x1="105"
-                    y1="145"
-                    x2="82"
-                    y2="173"
-                    stroke="#202733"
-                    stroke-width="4"
-                    stroke-linecap="round"
-                />
-
-                <!-- pierna derecha -->
-                <line
-                    x1="105"
-                    y1="145"
-                    x2="128"
-                    y2="173"
-                    stroke="#202733"
-                    stroke-width="4"
-                    stroke-linecap="round"
-                />
-
-            </g>
-
-
-            <!-- OBJETIVO -->
-
-            <g id="target">
-
-                <circle
-                    cx="480"
-                    cy="85"
-                    r="29"
-                    fill="white"
-                    stroke="#202733"
-                    stroke-width="4"
-                />
-
-                <circle
-                    cx="480"
-                    cy="85"
-                    r="19"
-                    fill="none"
-                    stroke="#202733"
-                    stroke-width="3"
-                />
-
-                <circle
-                    cx="480"
-                    cy="85"
-                    r="7"
-                    fill="#202733"
-                />
-
-            </g>
-
-
-            <!-- PELOTA -->
-
-            <g id="ball">
-
-                <circle
-                    cx="105"
-                    cy="85"
-                    r="7"
-                    fill="#202733"
-                />
-
-            </g>
-
-
-            <!-- PUNTOS A-G -->
-
-            <g id="points"></g>
-
-        </svg>
-
-
-        <div class="hint">
-            Selecciona A, B, C, D, E, F o G.
-            La pelota mantiene la misma velocidad en todos los recorridos.
-        </div>
-
+    <div class="meta">
+      <div>Intentos: <span id="dots"></span></div>
+      <div>Aciertos <b id="hits">0</b>/<b id="rounds">0</b> · Racha <b id="streak">0</b> · Mejor <b id="best">0</b></div>
     </div>
+  </div>
 
+  <div class="area">
+    <svg id="scene" viewBox="0 0 700 410" role="img" aria-label="Juego de trayectoria">
+      <line x1="70" y1="335" x2="630" y2="335" class="ink" stroke-width="3"/>
+      <g id="paths"></g>
+      <g id="player" class="ink" stroke-width="4" stroke-linecap="round">
+        <circle cx="105" cy="85" r="16" style="fill:var(--card)" stroke-width="3"/>
+        <path d="M105 101V145M105 112L78 128M105 112L132 128M105 145L82 173M105 145L128 173"/>
+      </g>
+      <g id="target" class="ink">
+        <circle cx="480" cy="85" r="29" style="fill:var(--card)" stroke-width="4"/>
+        <circle cx="480" cy="85" r="19" stroke-width="3"/>
+        <circle cx="480" cy="85" r="7" class="fillink"/>
+      </g>
+      <circle id="ball" r="7" fill="var(--acc)"/>
+      <g id="points"></g>
+    </svg>
+    <div class="hint">Haz clic o pulsa A–G en el teclado. La velocidad es constante: menos distancia = menos tiempo.</div>
+  </div>
 
-    <div class="controls">
-
-        <div
-            class="status"
-            id="status"
-        >
-            ¿Qué punto produce el recorrido más corto?
-        </div>
-
-        <button
-            id="reset"
-            type="button"
-        >
-            Nueva ronda
-        </button>
-
-    </div>
-
-
-    <!-- RESULTADO -->
-
-    <div
-        id="result"
-        class="result"
-        hidden
-    ></div>
-
+  <div class="controls">
+    <div class="status" id="status" aria-live="polite"></div>
+    <button id="reset" type="button">Nueva ronda</button>
+  </div>
+  <div id="result" class="result" hidden></div>
 </div>
 
-
 <script>
-
-    /*
-    ============================================================
-        CONFIGURACIÓN DEL JUEGO
-    ============================================================
-    */
-
-    const svg = document.getElementById("scene");
-
-    const pointsContainer =
-        document.getElementById("points");
-
-    const pathsContainer =
-        document.getElementById("paths");
-
-    const ball =
-        document.querySelector("#ball circle");
-
-    const status =
-        document.getElementById("status");
-
-    const result =
-        document.getElementById("result");
-
-    const attemptsElement =
-        document.getElementById("attempts");
-
-    const resetButton =
-        document.getElementById("reset");
-
-
-    /*
-    ============================================================
-        POSICIONES
-    ============================================================
-    */
-
-    let player = {
-        x: 105,
-        y: 85
-    };
-
-    let target = {
-        x: 480,
-        y: 85
-    };
-
-
-    /*
-    Los puntos A-G están sobre la misma línea.
-    */
-
-    const letters = [
-        "A",
-        "B",
-        "C",
-        "D",
-        "E",
-        "F",
-        "G"
-    ];
-
-
-    const pointXPositions = [
-        145,
-        215,
-        285,
-        355,
-        425,
-        495,
-        565
-    ];
-
-
-    let points = [];
-
-
-    /*
-    Puntos seleccionados por el jugador.
-    */
-
-    let usedAttempts = [];
-
-
-    /*
-    La velocidad es CONSTANTE.
-
-    No importa qué punto elija el jugador:
-    la velocidad será la misma.
-
-    El tiempo dependerá de la distancia.
-    */
-
-    const BALL_SPEED = 115;
-
-
-    let animationFrame = null;
-
-    let animating = false;
-
-
-
-    /*
-    ============================================================
-        DISTANCIA ENTRE DOS PUNTOS
-    ============================================================
-    */
-
-    function distance(a, b) {
-
-        return Math.hypot(
-            a.x - b.x,
-            a.y - b.y
-        );
-
-    }
-
-
-
-    /*
-    ============================================================
-        CREAR UNA NUEVA RONDA
-    ============================================================
-    */
-
-    function newRound() {
-
-        cancelAnimationFrame(animationFrame);
-
-        animating = false;
-
-        usedAttempts = [];
-
-        result.hidden = true;
-
-        result.innerHTML = "";
-
-
-        /*
-        Cambiamos ligeramente la posición
-        del jugador y del objetivo.
-        */
-
-        player.y =
-            75 + Math.random() * 100;
-
-        target.y =
-            55 + Math.random() * 65;
-
-
-        /*
-        Todos los puntos permanecen sobre
-        la misma línea.
-        */
-
-        const lineY = 320;
-
-
-        points =
-            pointXPositions.map(
-                (x, index) => {
-
-                    return {
-
-                        x: x,
-
-                        y: lineY,
-
-                        label: letters[index]
-
-                    };
-
-                }
-            );
-
-
-        /*
-        ========================================================
-            CALCULAR DISTANCIA TOTAL
-        ========================================================
-
-        Distancia total:
-
-        jugador → punto
-                  +
-        punto → objetivo
-        */
-
-        points.forEach(point => {
-
-            const distanceToPoint =
-                distance(player, point);
-
-            const distanceToTarget =
-                distance(point, target);
-
-            point.totalDistance =
-                distanceToPoint +
-                distanceToTarget;
-
-        });
-
-
-        /*
-        ========================================================
-            ENCONTRAR EL PUNTO ÓPTIMO
-        ========================================================
-        */
-
-        const minimumDistance =
-            Math.min(
-                ...points.map(
-                    point => point.totalDistance
-                )
-            );
-
-
-        points.forEach(point => {
-
-            point.isOptimal =
-                point.totalDistance ===
-                minimumDistance;
-
-        });
-
-
-        renderScene();
-
-        updateAttempts();
-
-        status.textContent =
-            "¿Qué punto produce el recorrido más corto?";
-
-    }
-
-
-
-    /*
-    ============================================================
-        DIBUJAR ESCENA
-    ============================================================
-    */
-
-    function renderScene() {
-
-        /*
-        Mover jugador
-        */
-
-        const playerGroup =
-            document.getElementById("player");
-
-        playerGroup.setAttribute(
-            "transform",
-            `translate(0, ${player.y - 85})`
-        );
-
-
-        /*
-        Mover objetivo
-        */
-
-        const targetGroup =
-            document.getElementById("target");
-
-        targetGroup.setAttribute(
-            "transform",
-            `translate(0, ${target.y - 85})`
-        );
-
-
-        /*
-        Regresar pelota al jugador
-        */
-
-        ball.setAttribute(
-            "cx",
-            player.x
-        );
-
-        ball.setAttribute(
-            "cy",
-            player.y
-        );
-
-
-        /*
-        Crear puntos A-G
-        */
-
-        pointsContainer.innerHTML = "";
-
-
-        points.forEach(
-            (point, index) => {
-
-                const group =
-                    document.createElementNS(
-                        "http://www.w3.org/2000/svg",
-                        "g"
-                    );
-
-
-                group.classList.add("point");
-
-
-                group.dataset.index =
-                    index;
-
-
-                /*
-                Círculo
-                */
-
-                const circle =
-                    document.createElementNS(
-                        "http://www.w3.org/2000/svg",
-                        "circle"
-                    );
-
-
-                circle.setAttribute(
-                    "cx",
-                    point.x
-                );
-
-                circle.setAttribute(
-                    "cy",
-                    point.y
-                );
-
-                circle.setAttribute(
-                    "r",
-                    11
-                );
-
-
-                /*
-                Letra
-                */
-
-                const text =
-                    document.createElementNS(
-                        "http://www.w3.org/2000/svg",
-                        "text"
-                    );
-
-
-                text.setAttribute(
-                    "x",
-                    point.x
-                );
-
-                text.setAttribute(
-                    "y",
-                    point.y + 18
-                );
-
-
-                text.textContent =
-                    point.label;
-
-
-                group.appendChild(circle);
-
-                group.appendChild(text);
-
-
-                /*
-                Cuando el usuario selecciona
-                el punto.
-                */
-
-                group.addEventListener(
-                    "click",
-                    () => {
-
-                        selectPoint(index);
-
-                    }
-                );
-
-
-                pointsContainer.appendChild(group);
-
-            }
-        );
-
-
-        /*
-        Dibujar visualmente la trayectoria
-        matemáticamente óptima.
-        */
-
-        renderOptimalPath();
-
-    }
-
-
-
-    /*
-    ============================================================
-        DIBUJAR TRAYECTORIA ÓPTIMA
-    ============================================================
-    */
-
-    function renderOptimalPath() {
-
-        pathsContainer.innerHTML = "";
-
-
-        const optimalPoint =
-            points.find(
-                point => point.isOptimal
-            );
-
-
-        if (!optimalPoint) {
-            return;
-        }
-
-
-        /*
-        Primer segmento:
-
-        jugador → punto
-        */
-
-        const line1 =
-            document.createElementNS(
-                "http://www.w3.org/2000/svg",
-                "line"
-            );
-
-
-        line1.setAttribute(
-            "x1",
-            player.x
-        );
-
-        line1.setAttribute(
-            "y1",
-            player.y
-        );
-
-        line1.setAttribute(
-            "x2",
-            optimalPoint.x
-        );
-
-        line1.setAttribute(
-            "y2",
-            optimalPoint.y
-        );
-
-
-        /*
-        Segundo segmento:
-
-        punto → objetivo
-        */
-
-        const line2 =
-            document.createElementNS(
-                "http://www.w3.org/2000/svg",
-                "line"
-            );
-
-
-        line2.setAttribute(
-            "x1",
-            optimalPoint.x
-        );
-
-        line2.setAttribute(
-            "y1",
-            optimalPoint.y
-        );
-
-        line2.setAttribute(
-            "x2",
-            target.x
-        );
-
-        line2.setAttribute(
-            "y2",
-            target.y
-        );
-
-
-        [line1, line2].forEach(line => {
-
-            line.setAttribute(
-                "stroke",
-                "#c5cad3"
-            );
-
-            line.setAttribute(
-                "stroke-width",
-                "2"
-            );
-
-            line.setAttribute(
-                "stroke-dasharray",
-                "5 6"
-            );
-
-        });
-
-
-        pathsContainer.appendChild(line1);
-
-        pathsContainer.appendChild(line2);
-
-    }
-
-
-
-    /*
-    ============================================================
-        SELECCIONAR PUNTO
-    ============================================================
-    */
-
-    function selectPoint(index) {
-
-        /*
-        No permitir seleccionar mientras
-        la pelota está en movimiento.
-        */
-
-        if (animating) {
-            return;
-        }
-
-
-        /*
-        Máximo 2 intentos.
-        */
-
-        if (usedAttempts.length >= 2) {
-            return;
-        }
-
-
-        /*
-        No permitir usar el mismo punto
-        dos veces.
-        */
-
-        if (usedAttempts.includes(index)) {
-            return;
-        }
-
-
-        usedAttempts.push(index);
-
-
-        updateAttempts();
-
-
-        /*
-        Marcar visualmente el punto.
-        */
-
-        const pointElements =
-            document.querySelectorAll(".point");
-
-
-        pointElements.forEach(
-            (element, i) => {
-
-                if (i === index) {
-
-                    element.classList.add(
-                        "selected"
-                    );
-
-                }
-
-            }
-        );
-
-
-        const selectedPoint =
-            points[index];
-
-
-        status.textContent =
-            `Elegiste ${selectedPoint.label}. Observa la trayectoria...`;
-
-
-        /*
-        Lanzar pelota.
-        */
-
-        animateBall(
-            selectedPoint,
-            () => {
-
-                if (
-                    usedAttempts.length < 2
-                ) {
-
-                    status.textContent =
-                        "Te queda 1 intento. Puedes probar otro punto.";
-
-                } else {
-
-                    finishGame();
-
-                }
-
-            }
-        );
-
-    }
-
-
-
-    /*
-    ============================================================
-        ANIMAR PELOTA
-    ============================================================
-    */
-
-    function animateBall(
-        selectedPoint,
-        callback
-    ) {
-
-        animating = true;
-
-
-        const start =
-            {
-                x: player.x,
-                y: player.y
-            };
-
-
-        const middle =
-            {
-                x: selectedPoint.x,
-                y: selectedPoint.y
-            };
-
-
-        const end =
-            {
-                x: target.x,
-                y: target.y
-            };
-
-
-        /*
-        Distancia de cada segmento.
-        */
-
-        const distance1 =
-            distance(
-                start,
-                middle
-            );
-
-
-        const distance2 =
-            distance(
-                middle,
-                end
-            );
-
-
-        const totalDistance =
-            distance1 +
-            distance2;
-
-
-        /*
-        Como la velocidad es constante:
-
-        tiempo = distancia / velocidad
-        */
-
-        const duration =
-            (totalDistance / BALL_SPEED)
-            * 1000;
-
-
-        const startTime =
-            performance.now();
-
-
-        function animate(
-            currentTime
-        ) {
-
-            const elapsed =
-                currentTime -
-                startTime;
-
-
-            const progress =
-                Math.min(
-                    elapsed / duration,
-                    1
-                );
-
-
-            /*
-            Distancia que ya recorrió
-            la pelota.
-            */
-
-            const travelled =
-                progress *
-                totalDistance;
-
-
-            let x;
-            let y;
-
-
-            /*
-            PRIMER SEGMENTO
-            */
-
-            if (
-                travelled <= distance1
-            ) {
-
-                const segmentProgress =
-                    distance1 === 0
-                        ? 1
-                        : travelled / distance1;
-
-
-                x =
-                    start.x +
-                    (middle.x - start.x)
-                    * segmentProgress;
-
-
-                y =
-                    start.y +
-                    (middle.y - start.y)
-                    * segmentProgress;
-
-            }
-
-
-            /*
-            SEGUNDO SEGMENTO
-            */
-
-            else {
-
-                const segmentProgress =
-                    distance2 === 0
-                        ? 1
-                        : (
-                            travelled -
-                            distance1
-                        ) / distance2;
-
-
-                x =
-                    middle.x +
-                    (end.x - middle.x)
-                    * segmentProgress;
-
-
-                y =
-                    middle.y +
-                    (end.y - middle.y)
-                    * segmentProgress;
-
-            }
-
-
-            /*
-            Actualizar posición de pelota.
-            */
-
-            ball.setAttribute(
-                "cx",
-                x
-            );
-
-            ball.setAttribute(
-                "cy",
-                y
-            );
-
-
-            /*
-            Continuar animación.
-            */
-
-            if (progress < 1) {
-
-                animationFrame =
-                    requestAnimationFrame(
-                        animate
-                    );
-
-            }
-
-            else {
-
-                animating = false;
-
-                callback();
-
-            }
-
-        }
-
-
-        animationFrame =
-            requestAnimationFrame(
-                animate
-            );
-
-    }
-
-
-
-    /*
-    ============================================================
-        ACTUALIZAR INTENTOS
-    ============================================================
-    */
-
-    function updateAttempts() {
-
-        attemptsElement.innerHTML =
-            "Intentos:";
-
-
-        for (
-            let i = 0;
-            i < 2;
-            i++
-        ) {
-
-            const dot =
-                document.createElement("span");
-
-
-            dot.classList.add(
-                "attempt"
-            );
-
-
-            if (
-                usedAttempts.length > i
-            ) {
-
-                dot.classList.add(
-                    "used"
-                );
-
-            }
-
-
-            attemptsElement.appendChild(
-                dot
-            );
-
-        }
-
-    }
-
-
-
-    /*
-    ============================================================
-        TERMINAR JUEGO
-    ============================================================
-    */
-
-    function finishGame() {
-
-        /*
-        Encontrar punto matemáticamente óptimo.
-        */
-
-        const optimalPoint =
-            points.reduce(
-                (best, current) => {
-
-                    return current.totalDistance <
-                        best.totalDistance
-                        ? current
-                        : best;
-
-                }
-            );
-
-
-        /*
-        Encontrar el mejor intento
-        del jugador.
-        */
-
-        const bestAttemptIndex =
-            usedAttempts.reduce(
-                (bestIndex, currentIndex) => {
-
-                    if (
-                        points[currentIndex]
-                            .totalDistance
-                        <
-                        points[bestIndex]
-                            .totalDistance
-                    ) {
-
-                        return currentIndex;
-
-                    }
-
-                    return bestIndex;
-
-                }
-            );
-
-
-        const bestAttempt =
-            points[
-                bestAttemptIndex
-            ];
-
-
-        /*
-        Convertir distancia en tiempo.
-        */
-
-        const optimalTime =
-            optimalPoint.totalDistance /
-            BALL_SPEED;
-
-
-        const playerTime =
-            bestAttempt.totalDistance /
-            BALL_SPEED;
-
-
-        /*
-        Marcar punto óptimo.
-        */
-
-        points.forEach(
-            (point, index) => {
-
-                if (
-                    point.isOptimal
-                ) {
-
-                    document
-                        .querySelectorAll(".point")
-                        [index]
-                        .classList.add(
-                            "optimal"
-                        );
-
-                }
-
-            }
-        );
-
-
-        /*
-        Mostrar resultado.
-        */
-
-        result.hidden = false;
-
-
-        result.innerHTML = `
-
-            <strong>Resultado</strong>
-
-            <div style="
-                margin-top:5px;
-                color:#667085;
-                font-size:13px;
-            ">
-
-                El punto óptimo era
-                <strong>${optimalPoint.label}</strong>.
-
-            </div>
-
-
-            <div class="stats">
-
-                <div class="stat">
-
-                    <span>
-                        Tu mejor punto
-                    </span>
-
-                    <strong>
-                        ${bestAttempt.label}
-                    </strong>
-
-                </div>
-
-
-                <div class="stat">
-
-                    <span>
-                        Tu tiempo
-                    </span>
-
-                    <strong>
-                        ${playerTime.toFixed(2)} s
-                    </strong>
-
-                </div>
-
-
-                <div class="stat">
-
-                    <span>
-                        Tiempo óptimo
-                    </span>
-
-                    <strong>
-                        ${optimalTime.toFixed(2)} s
-                    </strong>
-
-                </div>
-
-            </div>
-
-        `;
-
-
-        status.textContent =
-            "Ronda terminada.";
-
-    }
-
-
-
-    /*
-    ============================================================
-        NUEVA RONDA
-    ============================================================
-    */
-
-    resetButton.addEventListener(
-        "click",
-        newRound
-    );
-
-
-    /*
-    ============================================================
-        INICIAR JUEGO
-    ============================================================
-    */
-
-    newRound();
-
+const NS = "http://www.w3.org/2000/svg", SPEED = 115, LINE_Y = 335, MAX = 2;
+const $ = id => document.getElementById(id);
+const ball = $("ball"), statusEl = $("status"), resultEl = $("result");
+const letters = "ABCDEFG".split(""), xs = [145, 215, 285, 355, 425, 495, 565];
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const mk = (tag, attrs) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
+
+let player, target, points, tries, animating, raf;
+let stats = { rounds: 0, hits: 0, streak: 0, best: 0 };
+try { Object.assign(stats, JSON.parse(localStorage.getItem("trayectoria") || "{}")); } catch (e) {}
+stats = { rounds: 0, hits: 0, streak: 0, best: stats.best || 0 };
+
+function renderStats() {
+  $("hits").textContent = stats.hits; $("rounds").textContent = stats.rounds;
+  $("streak").textContent = stats.streak; $("best").textContent = stats.best;
+  $("dots").innerHTML = Array.from({ length: MAX }, (_, i) => `<span class="dot${i < tries.length ? " used" : ""}"></span>`).join("");
+}
+
+function newRound() {
+  cancelAnimationFrame(raf); animating = false; tries = [];
+  resultEl.hidden = true; $("paths").innerHTML = "";
+  player = { x: 105, y: 75 + Math.random() * 100 };
+  target = { x: 480, y: 55 + Math.random() * 65 };
+  points = xs.map((x, i) => ({ x, y: LINE_Y, label: letters[i] }));
+  points.forEach(p => p.total = dist(player, p) + dist(p, target));
+  const min = Math.min(...points.map(p => p.total));
+  points.forEach(p => p.optimal = p.total === min);
+  $("player").setAttribute("transform", `translate(0 ${player.y - 85})`);
+  $("target").setAttribute("transform", `translate(0 ${target.y - 85})`);
+  ball.setAttribute("cx", player.x); ball.setAttribute("cy", player.y);
+  drawPoints(); renderStats();
+  statusEl.textContent = "¿Qué punto produce el recorrido más corto?";
+}
+
+function drawPoints() {
+  const g = $("points"); g.innerHTML = "";
+  points.forEach((p, i) => {
+    const el = mk("g", { class: "pt", tabindex: 0, role: "button", "aria-label": "Punto " + p.label });
+    el.append(mk("circle", { cx: p.x, cy: p.y, r: 11 }));
+    const t = mk("text", { x: p.x, y: p.y + 30 }); t.textContent = p.label; el.append(t);
+    el.addEventListener("click", () => select(i));
+    el.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); select(i); } });
+    g.append(el);
+  });
+}
+
+function select(i) {
+  if (animating || tries.length >= MAX || tries.includes(i)) return;
+  tries.push(i); renderStats();
+  const p = points[i];
+  document.querySelectorAll(".pt")[i].classList.add("sel");
+  const col = tries.length === 1 ? "#f79009" : "#635bff";
+  $("paths").append(mk("polyline", { points: `${player.x},${player.y} ${p.x},${p.y} ${target.x},${target.y}`,
+    fill: "none", stroke: col, "stroke-width": 2, "stroke-opacity": .55 }));
+  statusEl.textContent = `Elegiste ${p.label}: ${(p.total / SPEED).toFixed(2)} s...`;
+  animate(p, () => {
+    if (tries.length < MAX) statusEl.textContent = `${p.label}: ${(p.total / SPEED).toFixed(2)} s. Te queda 1 intento, prueba otro punto.`;
+    else finish();
+  });
+}
+
+function animate(p, done) {
+  animating = true;
+  const d1 = dist(player, p), total = p.total, dur = total / SPEED * 1000, t0 = performance.now();
+  (function step(now) {
+    const s = Math.min((now - t0) / dur, 1) * total;
+    const [a, b, k] = s <= d1 ? [player, p, d1 ? s / d1 : 1] : [p, target, (s - d1) / (total - d1)];
+    ball.setAttribute("cx", a.x + (b.x - a.x) * k); ball.setAttribute("cy", a.y + (b.y - a.y) * k);
+    if (s < total) raf = requestAnimationFrame(step); else { animating = false; done(); }
+  })(t0);
+}
+
+function finish() {
+  const opt = points.find(p => p.optimal);
+  const best = tries.map(i => points[i]).reduce((a, b) => b.total < a.total ? b : a);
+  const tOpt = opt.total / SPEED, tYou = best.total / SPEED, gap = tYou - tOpt;
+  const hit = best.optimal;
+  stats.rounds++; if (hit) { stats.hits++; stats.streak++; } else stats.streak = 0;
+  if (stats.streak > stats.best) { stats.best = stats.streak; try { localStorage.setItem("trayectoria", JSON.stringify({ best: stats.best })); } catch (e) {} }
+  document.querySelectorAll(".pt").forEach((el, i) => { el.classList.add("locked"); if (points[i].optimal) el.classList.add("opt"); });
+  $("paths").append(mk("polyline", { points: `${player.x},${player.y} ${opt.x},${opt.y} ${target.x},${target.y}`,
+    fill: "none", stroke: "#12b76a", "stroke-width": 3, "stroke-dasharray": "6 5" }));
+  resultEl.hidden = false;
+  resultEl.innerHTML = `<div class="verdict ${hit ? "ok" : "bad"}">${hit ? "¡Trayectoria óptima!" : "Casi: el óptimo era " + opt.label}</div>
+    <div class="stats">
+      <div class="stat"><span>Tu mejor punto</span><strong>${best.label} · ${tYou.toFixed(2)} s</strong></div>
+      <div class="stat"><span>Tiempo óptimo (${opt.label})</span><strong>${tOpt.toFixed(2)} s</strong></div>
+      <div class="stat"><span>Diferencia</span><strong>${hit ? "0.00 s" : "+" + gap.toFixed(2) + " s (" + (gap / tOpt * 100).toFixed(1) + "%)"}</strong></div>
+    </div>`;
+  statusEl.textContent = "Ronda terminada."; renderStats();
+}
+
+$("reset").addEventListener("click", newRound);
+document.addEventListener("keydown", e => {
+  const i = letters.indexOf(e.key.toUpperCase());
+  if (i >= 0 && e.key.length === 1) select(i);
+  else if (e.key === "Enter" && tries.length >= MAX && !animating) newRound();
+});
+newRound();
 </script>
-
 </body>
 </html>

@@ -5,9 +5,9 @@ Juego web de un solo archivo (`index.html`). Una pelota sale del jugador, toca u
 ## Cómo jugar
 
 1. Elige un punto (A–G) con clic, con teclado o con `Tab` + `Enter`.
-2. La pelota recorre `jugador → punto → objetivo` a velocidad constante y se muestra su tiempo.
+2. La pelota recorre `jugador → punto → objetivo` a velocidad constante. Mientras avanza, se muestran en vivo el **tiempo** y la **distancia** recorrida.
 3. Tienes **2 intentos** por ronda y no puedes repetir punto.
-4. Al terminar se revela la ruta óptima (en verde) y se compara tu mejor tiempo con el óptimo.
+4. Al terminar se revela la ruta óptima (en verde) y una tabla compara **Óptimo**, **Anterior** y **Mejor**.
 
 ## Controles
 
@@ -20,8 +20,17 @@ Juego web de un solo archivo (`index.html`). Una pelota sale del jugador, toca u
 ## Características
 
 - Posiciones aleatorias del jugador y del objetivo en cada ronda.
-- Tiempo por intento y trayectorias marcadas (naranja el 1.º, morado el 2.º).
-- Resultado con diferencia en segundos y porcentaje contra el óptimo.
+- Contador en vivo de tiempo (s) y distancia recorrida (u) durante la animación.
+- Trayectorias de cada intento marcadas (naranja el 1.º, morado el 2.º).
+- Tabla de resultados con letra, tiempo y distancia de cada fila:
+
+  | | Punto | Tiempo | Distancia |
+  |---|---|---|---|
+  | **Óptimo** | Punto óptimo (`?` hasta terminar la ronda) | | |
+  | **Anterior** | Primer intento (al elegir el segundo) | | |
+  | **Mejor** | Mejor intento completado | | |
+
+- Veredicto y diferencia con el óptimo, en segundos y porcentaje.
 - Marcador: aciertos/rondas, racha actual y mejor racha.
 - Modo oscuro automático (`prefers-color-scheme`).
 - Tema forzable con `<html data-theme="dark">` o `<html data-theme="light">`.
@@ -62,4 +71,4 @@ Solo la **mejor racha** se guarda en `localStorage` (clave `trayectoria`). Si el
 index.html   # marcado, estilos y lógica
 ```
 
-Funciones principales: `newRound()`, `select(i)`, `animate(p, done)`, `finish()`.
+Funciones principales: `newRound()`, `select(i)`, `animate(p, done)`, `setLive(s)`, `renderCmp()`, `finish()`.
